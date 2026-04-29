@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project is an ESP32 ESP-IDF FreeRTOS prototype for a Central Florida theme park ride safety controller. The system simulates a ride controller that monitors a ride speed/load sensor, warns the operator when the ride condition approaches an unsafe range, and enters a latched emergency-stop state when the E-STOP button or critical sensor threshold is triggered.
+This project is an ESP32 FreeRTOS prototype for a Theme Park Ride Safety Controller. The system simulates a ride controller that monitors a ride speed/load sensor, warns the operator when the ride condition approaches an unsafe range, and enters a latched emergency-stop state when the E-STOP button or critical sensor threshold is triggered.
 
 The potentiometer represents a simulated ride speed/load sensor. The green LED is the ride heartbeat, the yellow LED is the warning indicator, and the red LED is the emergency-stop indicator.
 
@@ -27,34 +27,26 @@ The potentiometer represents a simulated ride speed/load sensor. The green LED i
 | `Logger` | 1 | Soft | 200 ms service target | Prints sensor/status data to UART serial monitor |
 | `Diagnostic` | 1 | Soft | 1000 ms period/deadline | Simulates variable-time maintenance diagnostics |
 
-## Synchronization and Communication
-
-| Primitive | Used For | Why It Is Needed |
-|---|---|---|
-| Binary semaphore | ISR to `EmergencyResponse` task | Lets the button ISR stay short while waking the hard emergency task quickly |
-| Queue | `SensorMonitor` to `Logger` | Transfers timestamped sensor readings without sharing raw variables unsafely |
-| Mutex | UART/serial printing | Prevents multiple tasks from interleaving console output |
-| Critical section | Shared `rideState` variable | Protects read/write access from multiple tasks |
 
 ## Engineering Analysis Questions
 
 ### 1. Scheduler Fit
 
-The scheduler setup fits this ride-control prototype because the hard safety tasks have the highest priorities. The `EmergencyResponse` task runs at priority 5, so it can preempt all other tasks when the E-STOP semaphore is given. The `SensorMonitor` task runs at priority 4 and uses `vTaskDelayUntil()` with a 50 ms period, which keeps the sensor sampling periodic instead of drifting over time. The soft tasks, such as `Logger`, `Heartbeat`, and `Diagnostic`, run at lower priorities, so they should not block the hard safety path. A timestamp pair to cite from the serial monitor should look like: `[ESTOP] Emergency stop handled @ ____ ms | ISR-to-task latency = ____ ms | deadline = 20 ms`; if the latency value is below 20 ms, that proves the hard E-STOP deadline was met in Wokwi.
+The scheduler setup fits this ride control design because the hard safety tasks have the highest priorities. The emergency response task runs at priority 5, so it can preempt all other tasks when the E-STOP button is triggered. The sensor monitor task runs at priority 4 and uses `vTaskDelayUntil()` with a 200 ms period, which keeps the sensor sampling periodic instead of drifting over time. The soft tasks, such as logger, heartbeat and diagnostics, run at lower priorities, so they should not block the hard safety path. A timestamp pair to cite from the output should look like: `[ESTOP] handled @ 8408 ms | latency = 0 ms | deadline = 50 ms`; since the latency value is below 50 ms, that proves the hard E-STOP deadline was met.
 
 ### 2. Race-Proofing
 
-A race could occur on the shared `rideState` variable because the sensor task, emergency task, heartbeat task, and logger task all use the ride state. The protected lines are inside the helper functions `get_ride_state()` and `set_ride_state()`, where `rideState` is read or written. These accesses are protected using `portENTER_CRITICAL(&rideStateMux)` and `portEXIT_CRITICAL(&rideStateMux)`. This prevents one task from reading the state while another task is updating it. Serial printing is also protected using the `serialMutex`, so messages from the logger, diagnostic task, and emergency task do not overlap in the UART output.
+A race could occur on the shared `rideState` variable because the sensor task, emergency task, heartbeat task, and logger task all use this state. The protected lines are inside the helper functions `get_ride_state()` at lines 109 to 117 and `set_ride_state()` at lines 119 to 126, where `rideState` is read or written. These are protected using `portENTER_CRITICAL(&rideStateMux)` and `portEXIT_CRITICAL(&rideStateMux)` primitives. This prevents one task from reading the state while another task is updating it. Also, serial printing is protected using the `serialMutex`, so messages from the logger, diagnostic task, and emergency task do not overlap in the UART output.
 
 ### 3. Worst-Case Spike
 
-The heaviest load tested should be turning the potentiometer near its maximum value while also pressing the E-STOP button. This creates the worst case because the sensor task detects an emergency threshold, the ISR can also trigger the emergency semaphore, and the diagnostic task performs its largest variable workload. The diagnostic task intentionally increases its loop count based on the ADC value, which simulates heavier maintenance processing during high ride load. The important margin is the E-STOP response time compared to the 20 ms hard deadline. For example, if the serial monitor shows an ISR-to-task latency of 2 ms, then the remaining margin is `20 ms - 2 ms = 18 ms` before the hard deadline would slip.
+The heaviest load I tested was when I maxed out the potentiometer value and spammed the e-stop button at the same time. This creates the worst case because the sensor task detects an emergency threshold, the ISR can also trigger the emergency semaphore, and the diagnostic task performs its largest variable workload. The diagnostic task intentionally increases its loop count based on the ADC value, which simulates heavier maintenance processing during the highest ride conditions. The important margin is the E-STOP response time compared to the 50 ms hard deadline. If the serial monitor shows an ISR to task latency of 7 ms, then the remaining margin would be 43 ms before the hard deadline would slip.
 
 ### 4. Design Trade-off
 
-One feature that was simplified was full ride restart/reset behavior after an E-STOP. The system intentionally latches into the `ESTOP` state instead of automatically returning to normal operation. This is the safer choice for a theme park ride because a real emergency stop should require operator inspection and manual reset before the ride can continue. Avoiding automatic reset also keeps the timing behavior more predictable because the system does not need extra restart sequencing, revalidation checks, or multiple recovery states. For this proof of concept, the priority is showing that the hard emergency path responds quickly and safely.
+One feature that was simplified was full ride restart/reset behavior after an E-STOP. The system intentionally latches into the `ESTOP` state instead of automatically returning to normal operation. I went with this to line up with what a ride would actually look like, since a true emergency stop would cause for a full system reset for the ride to continue. Avoiding automatic reset also keeps the timing behavior more predictable because the system does not need extra restart sequencing, revalidation checks, or other recovery states.
 
 ## AI Tool Use
 
-AI assistance was used to help draft the ESP-IDF FreeRTOS project structure, code comments, and README wording. The final code and timing proof should still be verified by running the project in Wokwi and checking the serial timestamps.
+AI was mainly used to help structure my initial project code. Since this application was essentially pulling all prior applications together, I figured it would be most efficient to use those to my advantage. I gathered some of the prior assignments we did in class that were relevant to my systems needs and had the LLM draft a project skeleton using the code that I had alread written. With the given context of liablilty issues, since these were prior "in-house" used codes, it shouldn't create any liability issues as it isn't another company's resources, rather my own. I also had it help with setting up the markdown file, as I do not like the intricacies of markdown formatting and would rather use the LLM as a resource to do this for me and then fill in the analysis after. Lastly, there were a few logic pieces within the code (where I have inline comments documenting) that I needed some additional help with finding working solutions. I explained what needed to happen in those cases and provided the block of code that it pertained to and had it create the correct logic. As one must do, I verified in testing afterward that it was working as intended, to not blindly rely on the given logic. Lastly, I had it generate the concurrency diagram. I do not have great software to create this myself and am a terrible drawer, so I figured it would be best to have the LLM do this for me.
 
