@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "author": "Real-Time Systems Application 6",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": { "builder": "esp-idf" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledHeartbeat",
+      "top": -118.8,
+      "left": 263,
+      "attrs": { "color": "green", "label": "Ride Alive" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rHeartbeat",
+      "top": -33,
+      "left": 235,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledWarning",
+      "top": -13.2,
+      "left": 263,
+      "attrs": { "color": "yellow", "label": "Ride Warning" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rWarning",
+      "top": 62,
+      "left": 235,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "ledEmergency",
+      "top": 82.8,
+      "left": 272.6,
+      "attrs": { "color": "red", "label": "Emergency Stop" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "rEmergency",
+      "top": 157,
+      "left": 235,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btnEstop",
+      "top": 217.4,
+      "left": 249.6,
+      "attrs": { "color": "red", "label": "E-STOP Button" }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "potSensor",
+      "top": 315.5,
+      "left": 211,
+      "attrs": { "label": "Ride Speed / Load Sensor" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:2", "rHeartbeat:1", "green", [ "h35", "v-120" ] ],
+    [ "rHeartbeat:2", "ledHeartbeat:A", "green", [] ],
+    [ "ledHeartbeat:C", "esp:GND.1", "black", [ "v20", "h-180" ] ],
+    [ "esp:18", "rWarning:1", "gold", [ "h45", "v-25" ] ],
+    [ "rWarning:2", "ledWarning:A", "gold", [] ],
+    [ "ledWarning:C", "esp:GND.1", "black", [ "v20", "h-180" ] ],
+    [ "esp:19", "rEmergency:1", "red", [ "h55", "v35" ] ],
+    [ "rEmergency:2", "ledEmergency:A", "red", [] ],
+    [ "ledEmergency:C", "esp:GND.1", "black", [ "v20", "h-180" ] ],
+    [ "btnEstop:1.l", "esp:4", "blue", [ "h-40", "v-60" ] ],
+    [ "btnEstop:2.l", "esp:GND.2", "black", [ "h-80", "v-120" ] ],
+    [ "potSensor:VCC", "esp:3V3", "red", [ "h-95", "v-250" ] ],
+    [ "potSensor:GND", "esp:GND.2", "black", [ "h-110", "v-160" ] ],
+    [ "potSensor:SIG", "esp:32", "purple", [ "h-130", "v-120" ] ]
+  ],
+  "dependencies": {}
+}
